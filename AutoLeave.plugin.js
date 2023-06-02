@@ -9,21 +9,30 @@
  */
 
 const config = {
-    "info": {
-        "name": "AutoLeave",
-        "authors": [{
-            "name": "sruusk",
-            "github_username": "sruusk"
+    info: {
+        name: "AutoLeave",
+        authors: [{
+            name: "sruusk",
+            github_username: "sruusk"
         }],
-        "version": "0.0.1",
-        "description": "Automatically leaves server after voice channel disconnect",
-        "github": "https://github.com/sruusk/BDPlugins",
-        "github_raw": "https://raw.githubusercontent.com/sruusk/BDPlugins/main/AutoLeave.plugin.js"
+        version: "0.0.1",
+        description: "Automatically leaves server after voice channel disconnect",
+        github: "https://github.com/sruusk/BDPlugins",
+        github_raw: "https://raw.githubusercontent.com/sruusk/BDPlugins/main/AutoLeave.plugin.js"
     },
-    "changelog": [
+    changelog: [
 
     ],
-    "main": "index.js"
+    main: "index.js",
+    defaultConfig: [
+        {
+            type: "switch",
+            id: "defaultLeave",
+            name: "Leave as default",
+            note: "Leave all new servers as default. If disabled you will be asked every time you join a new server.",
+            value: true
+        }
+    ]
 };
 
 class Dummy {
@@ -58,50 +67,72 @@ if (!global.ZeresPluginLibrary) {
 
 module.exports = !global.ZeresPluginLibrary ? Dummy : (([Plugin, Api]) => {
     const guilds = [];
+    const awaitingLeave = {};
 
     const plugin = (Plugin, Library) => {
-
+        const {PluginUtilities} = Library;
         let dirtyDispatch = BdApi.findModuleByProps("dispatch", "subscribe");
         if (!dirtyDispatch) console.error("[PLUGIN] AutoLeave : Dispatch Module not found")
 
         function ON_GUILD_JOINED(data){
-            console.log("Joined new guild", data);
-            const close = BdApi.showNotice(
-                "Leave server after voice disconnect?",
-                {
-                    type: "info",
-                    buttons: [
-                        {
-                            label: "No",
-                            onClick: () => {
-                                close();
-                            }
-                        },
-                        {
-                            label: "Yes",
-                            onClick: () => {
-                                console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
-                                guilds.push(data.guild.id);
-                                close();
-                            }
-                        }
-                    ],
-                    timeout: 10000
-                }
-            );
-        }
+            //console.log("Joined new guild", data);
 
-        const awaitingLeave = {};
+            let settings = PluginUtilities.loadSettings(config.info.name);
+            if(settings.defaultLeave){
+                //console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
+                guilds.push(data.guild.id);
+                const close = BdApi.showNotice(
+                    "Leaving server after voice disconnect!",
+                    {
+                        type: "error",
+                        buttons: [
+                            {
+                                label: "Cancel",
+                                onClick: () => {
+                                    guilds.splice(guilds.indexOf(data.guild.id), 1);
+                                    clearTimeout(awaitingLeave[data.guild.id]);
+                                    delete awaitingLeave[data.guild.id];
+                                    close();
+                                }
+                            }
+                        ]
+                    }
+                );
+            } else {
+                const close = BdApi.showNotice(
+                    "Leave server after voice disconnect?",
+                    {
+                        type: "info",
+                        buttons: [
+                            {
+                                label: "No",
+                                onClick: () => {
+                                    close();
+                                }
+                            },
+                            {
+                                label: "Yes",
+                                onClick: () => {
+                                    //console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
+                                    guilds.push(data.guild.id);
+                                    close();
+                                }
+                            }
+                        ],
+                        timeout: 10000
+                    }
+                );
+            }
+        }
         function ON_VOICE_STATE_UPDATE(data){
             //console.log("VOICE_STATE_UPDATE", data);
             if(!data?.voiceStates?.length) return;
             const { channelId, guildId } = data?.voiceStates[0];
             if(!channelId) { // User left voice channel
-                //console.log("User left voice channel");
                 if(guilds.includes(guildId)){
-                    console.log("User left voice channel in watched guild - leaving guild in 5 seconds");
+                    //console.log("User left voice channel in watched guild - leaving guild in 5 seconds");
                     awaitingLeave[guildId] = setTimeout(() => {
-                        console.log("Leaving guild", guildId);
+                        //console.log("Leaving guild", guildId);
                         BdApi.findModuleByProps("leaveGuild").leaveGuild(guildId);
                         guilds.splice(guilds.indexOf(guildId), 1);
                         delete awaitingLeave[guildId];
@@ -109,7 +140,7 @@ module.exports = !global.ZeresPluginLibrary ? Dummy : (([Plugin, Api]) => {
                 }
             } else { // User joined voice channel
                 if(awaitingLeave[guildId]){
-                    console.log("User joined voice channel in watched guild before leaving guild. Cancelling leave.");
+                    //console.log("User joined voice channel in watched guild before leaving guild. Cancelling leave.");
                     clearTimeout(awaitingLeave[guildId]);
                     delete awaitingLeave[guildId];
                 }
@@ -125,6 +156,11 @@ module.exports = !global.ZeresPluginLibrary ? Dummy : (([Plugin, Api]) => {
             onStop() {
                 dirtyDispatch.unsubscribe("GUILD_CREATE", ON_GUILD_JOINED);
                 dirtyDispatch.unsubscribe("VOICE_STATE_UPDATES", ON_VOICE_STATE_UPDATE);
+            }
+
+            getSettingsPanel() {
+                const panel = this.buildSettingsPanel();
+                return panel.getElement();
             }
         };
 
