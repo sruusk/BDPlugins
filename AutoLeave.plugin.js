@@ -17,11 +17,14 @@ const settings = BdApi.Data.load("AutoLeave", "settings") || {
 const guilds = [];
 const awaitingLeave = {};
 let close;
+
 //const dirtyDispatch = BdApi.findModuleByProps("dispatch", "subscribe");
 const dirtyDispatch = BdApi.Webpack.getModule((e) => e.dispatch && e.subscribe);
 if (!dirtyDispatch) console.error("[PLUGIN] AutoLeave : Dispatch Module not found");
+
 const leaveGuild = BdApi.Webpack.getModule((e) => e.leaveGuild)?.leaveGuild;
 if(!leaveGuild) console.error("[PLUGIN] AutoLeave : leaveGuild not found");
+
 const currentUserId = BdApi.Webpack.getModule(e => e.getCurrentUser)?.getCurrentUser()?.id;
 if(!currentUserId) console.error("[PLUGIN] AutoLeave : Current User ID not found");
 
@@ -32,6 +35,7 @@ const setSetting = (id, value) => {
 
 const ON_GUILD_JOINED = data => {
     if(settings.debug) console.log("Joined new guild", data);
+    if(close) close(); // Close any open notices
     if(settings.defaultLeave){
         if(settings.debug) console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
         guilds.push(data.guild.id);
