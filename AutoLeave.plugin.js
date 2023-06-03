@@ -93,6 +93,7 @@ const ON_VOICE_STATE_UPDATE = data => {
         if(settings.debug) console.log("User left voice channel", guildId);
         if(guilds.includes(guildId)){
             if(settings.debug) console.log("User left voice channel in watched guild - leaving guild in 5 seconds");
+            BdApi.UI.showToast("Leaving server in 5 seconds", {type: "success"});
             awaitingLeave[guildId] = setTimeout(() => {
                 if(settings.debug) console.log("Leaving guild", guildId);
                 //BdApi.findModuleByProps("leaveGuild").leaveGuild(guildId);
