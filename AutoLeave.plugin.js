@@ -35,6 +35,8 @@ const setSetting = (id, value) => {
 
 const ON_GUILD_JOINED = data => {
     if(settings.debug) console.log("Joined new guild", data);
+    const joined = new Date(data.guild.joined_at);
+    if(joined.getTime() < Date.now() - 30000) return; // Ignore guilds joined more than 30 seconds ago
     if(close) close(); // Close any open notices
     if(settings.defaultLeave){
         if(settings.debug) console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
