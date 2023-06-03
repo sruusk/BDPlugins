@@ -15,17 +15,20 @@ const defaultSettings = {
 const guilds = [];
 const awaitingLeave = {};
 let close;
-const dirtyDispatch = BdApi.findModuleByProps("dispatch", "subscribe");
+//const dirtyDispatch = BdApi.findModuleByProps("dispatch", "subscribe");
+const dirtyDispatch = BdApi.Webpack.getModule((e) => e.dispatch && e.subscribe);
 if (!dirtyDispatch) console.error("[PLUGIN] AutoLeave : Dispatch Module not found");
+const leaveGuild = BdApi.Webpack.getModule((e) => e.leaveGuild)?.leaveGuild;
+if(!leaveGuild) console.error("[PLUGIN] AutoLeave : leaveGuild not found");
 
 const setSetting = (id, value) => {
-    const settings = BdApi.loadData("AutoLeave", "settings", defaultSettings);
+    const settings = BdApi.Data.load("AutoLeave", "settings") || defaultSettings;
     settings[id] = value;
-    BdApi.saveData("AutoLeave", "settings", settings);
+    BdApi.Data.save("AutoLeave", "settings", settings);
 }
 
 const getSetting = (id) => {
-    const settings = BdApi.loadData("AutoLeave", "settings", defaultSettings);
+    const settings = BdApi.Data.load("AutoLeave", "settings") || defaultSettings;
     return settings[id];
 }
 
@@ -34,7 +37,7 @@ const ON_GUILD_JOINED = data => {
     if(getSetting("defaultLeave")){
         console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
         guilds.push(data.guild.id);
-        close = BdApi.showNotice(
+        close = BdApi.UI.showNotice(
             "Leaving server after voice disconnect!",
             {
                 type: "warning",
@@ -45,7 +48,7 @@ const ON_GUILD_JOINED = data => {
                             guilds.splice(guilds.indexOf(data.guild.id), 1);
                             clearTimeout(awaitingLeave[data.guild.id]);
                             delete awaitingLeave[data.guild.id];
-                            BdApi.showToast("Cancelled auto leave", {type: "success"});
+                            BdApi.UI.showToast("Cancelled auto leave", {type: "success"});
                             close();
                         }
                     }
@@ -53,7 +56,7 @@ const ON_GUILD_JOINED = data => {
             }
         );
     } else {
-        close = BdApi.showNotice(
+        close = BdApi.UI.showNotice(
             "Leave server after voice disconnect?",
             {
                 type: "info",
@@ -69,7 +72,7 @@ const ON_GUILD_JOINED = data => {
                         onClick: () => {
                             console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
                             guilds.push(data.guild.id);
-                            BdApi.showToast("Leaving server after voice disconnect", {type: "success"});
+                            BdApi.UI.showToast("Leaving server after voice disconnect", {type: "success"});
                             close();
                         }
                     }
@@ -89,7 +92,8 @@ const ON_VOICE_STATE_UPDATE = data => {
             console.log("User left voice channel in watched guild - leaving guild in 5 seconds");
             awaitingLeave[guildId] = setTimeout(() => {
                 console.log("Leaving guild", guildId);
-                BdApi.findModuleByProps("leaveGuild").leaveGuild(guildId);
+                //BdApi.findModuleByProps("leaveGuild").leaveGuild(guildId);
+                leaveGuild(guildId);
                 guilds.splice(guilds.indexOf(guildId), 1);
                 delete awaitingLeave[guildId];
                 if(close) close();
