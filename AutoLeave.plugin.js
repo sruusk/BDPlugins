@@ -8,9 +8,11 @@
  * @version 0.0.1
  */
 
-const defaultSettings = {
-    defaultLeave: true
-}
+const settings = BdApi.Data.load("AutoLeave", "settings") || {
+    defaultLeave: true,
+    debug: false
+};
+
 
 const guilds = [];
 const awaitingLeave = {};
@@ -20,22 +22,18 @@ const dirtyDispatch = BdApi.Webpack.getModule((e) => e.dispatch && e.subscribe);
 if (!dirtyDispatch) console.error("[PLUGIN] AutoLeave : Dispatch Module not found");
 const leaveGuild = BdApi.Webpack.getModule((e) => e.leaveGuild)?.leaveGuild;
 if(!leaveGuild) console.error("[PLUGIN] AutoLeave : leaveGuild not found");
+const currentUserId = BdApi.Webpack.getModule(e => e.getCurrentUser)?.getCurrentUser()?.id;
+if(!currentUserId) console.error("[PLUGIN] AutoLeave : Current User ID not found");
 
 const setSetting = (id, value) => {
-    const settings = BdApi.Data.load("AutoLeave", "settings") || defaultSettings;
     settings[id] = value;
     BdApi.Data.save("AutoLeave", "settings", settings);
 }
 
-const getSetting = (id) => {
-    const settings = BdApi.Data.load("AutoLeave", "settings") || defaultSettings;
-    return settings[id];
-}
-
 const ON_GUILD_JOINED = data => {
-    console.log("Joined new guild", data);
-    if(getSetting("defaultLeave")){
-        console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
+    if(settings.debug) console.log("Joined new guild", data);
+    if(settings.defaultLeave){
+        if(settings.debug) console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
         guilds.push(data.guild.id);
         close = BdApi.UI.showNotice(
             "Leaving server after voice disconnect!",
@@ -70,7 +68,7 @@ const ON_GUILD_JOINED = data => {
                     {
                         label: "Yes",
                         onClick: () => {
-                            console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
+                            if(settings.debug) console.log("Leaving Guild when user disconnects from voice channel", data.guild.id);
                             guilds.push(data.guild.id);
                             BdApi.UI.showToast("Leaving server after voice disconnect", {type: "success"});
                             close();
@@ -84,14 +82,15 @@ const ON_GUILD_JOINED = data => {
 }
 
 const ON_VOICE_STATE_UPDATE = data => {
-    console.log("VOICE_STATE_UPDATE", data);
+    if(settings.debug) console.log("VOICE_STATE_UPDATE", data);
     if(!data?.voiceStates?.length) return;
-    const { channelId, guildId } = data?.voiceStates[0];
-    if(!channelId) { // User left voice channel
+    const { userId, channelId, guildId } = data?.voiceStates[0];
+    if(!channelId && userId === currentUserId) { // User left voice channel
+        if(settings.debug) console.log("User left voice channel", guildId);
         if(guilds.includes(guildId)){
-            console.log("User left voice channel in watched guild - leaving guild in 5 seconds");
+            if(settings.debug) console.log("User left voice channel in watched guild - leaving guild in 5 seconds");
             awaitingLeave[guildId] = setTimeout(() => {
-                console.log("Leaving guild", guildId);
+                if(settings.debug) console.log("Leaving guild", guildId);
                 //BdApi.findModuleByProps("leaveGuild").leaveGuild(guildId);
                 leaveGuild(guildId);
                 guilds.splice(guilds.indexOf(guildId), 1);
@@ -101,7 +100,7 @@ const ON_VOICE_STATE_UPDATE = data => {
         }
     } else { // User joined voice channel
         if(awaitingLeave[guildId]){
-            console.log("User joined voice channel in watched guild before leaving guild. Cancelling leave.");
+            if(settings.debug) console.log("User joined voice channel in watched guild before leaving guild. Cancelling leave.");
             clearTimeout(awaitingLeave[guildId]);
             delete awaitingLeave[guildId];
         }
@@ -111,7 +110,8 @@ const ON_VOICE_STATE_UPDATE = data => {
 const createSwitch = (settingId, labelText) => {
     // Create a container for the switch and label
     const container = document.createElement("div");
-    container.style = "display: flex; align-items: center; justify-content: space-between;";
+    container.style = "display: flex; align-items: center; justify-content: space-between;" +
+        " margin-bottom: 10px; border-bottom: 1px solid #2f3136; padding-bottom: 10px;";
 
     // Create the label for the switch
     const label = document.createElement("label");
@@ -122,7 +122,7 @@ const createSwitch = (settingId, labelText) => {
     // Clone the switch element from BetterDiscord
     const switchElement = document.querySelector(".bd-switch").cloneNode(true);
     switchElement.classList.remove("bd-switch-checked");
-    switchElement.querySelector("input").checked = getSetting(settingId);
+    switchElement.querySelector("input").checked = settings[settingId];
     switchElement.querySelector("input").addEventListener("change", () => {
         setSetting(settingId, switchElement.querySelector("input").checked);
     });
@@ -133,7 +133,7 @@ const createSwitch = (settingId, labelText) => {
 
 module.exports = meta => ({
     start() {
-        console.log("AutoLeave started", meta);
+        if(settings.debug) console.log("AutoLeave started", meta);
         dirtyDispatch.subscribe("GUILD_CREATE", ON_GUILD_JOINED);
         dirtyDispatch.subscribe("VOICE_STATE_UPDATES", ON_VOICE_STATE_UPDATE);
     },
@@ -146,6 +146,7 @@ module.exports = meta => ({
         const container = document.createElement("div");
         container.style = "display: flex; flex-direction: column; width: 100%;";
         container.appendChild(createSwitch("defaultLeave", "Leave as default"));
+        container.appendChild(createSwitch("debug", "Print debug logs to console"));
         return container;
     }
 });
