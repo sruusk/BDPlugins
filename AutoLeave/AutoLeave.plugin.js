@@ -5,7 +5,7 @@
  * @description Automatically leaves server after voice channel disconnect
  * @website https://github.com/sruusk/BDPlugins/tree/main/AutoLeave
  * @source https://raw.githubusercontent.com/sruusk/BDPlugins/main/AutoLeave/AutoLeave.plugin.js
- * @version 0.0.1
+ * @version 0.0.2
  */
 
 const settings = BdApi.Data.load("AutoLeave", "settings") || {
