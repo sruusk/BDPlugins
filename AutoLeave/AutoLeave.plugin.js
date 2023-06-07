@@ -3,8 +3,8 @@
  * @author sruusk
  * @authorLink https://github.com/sruusk
  * @description Automatically leaves server after voice channel disconnect
- * @website https://github.com/sruusk/BDPlugins
- * @source https://raw.githubusercontent.com/sruusk/BDPlugins/main/AutoLeave.plugin.js
+ * @website https://github.com/sruusk/BDPlugins/tree/main/AutoLeave
+ * @source https://raw.githubusercontent.com/sruusk/BDPlugins/main/AutoLeave/AutoLeave.plugin.js
  * @version 0.0.1
  */
 
