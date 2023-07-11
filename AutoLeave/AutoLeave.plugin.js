@@ -5,7 +5,7 @@
  * @description Automatically leaves server after voice channel disconnect
  * @website https://github.com/sruusk/BDPlugins/tree/main/AutoLeave
  * @source https://raw.githubusercontent.com/sruusk/BDPlugins/main/AutoLeave/AutoLeave.plugin.js
- * @version 0.0.2
+ * @version 0.0.3
  */
 
 const settings = BdApi.Data.load("AutoLeave", "settings") || {
@@ -14,11 +14,10 @@ const settings = BdApi.Data.load("AutoLeave", "settings") || {
 };
 
 
-let guild;
-let awaitingLeave;
-let close;
+let guild; // Guild ID to leave from
+let awaitingLeave; // return value of setTimeout
+let close; // Close method of BD notices
 
-//const dirtyDispatch = BdApi.findModuleByProps("dispatch", "subscribe");
 const dirtyDispatch = BdApi.Webpack.getModule((e) => e.dispatch && e.subscribe);
 if (!dirtyDispatch) console.error("[PLUGIN] AutoLeave : Dispatch Module not found");
 
@@ -35,6 +34,7 @@ const setSetting = (id, value) => {
 
 const ON_GUILD_JOINED = data => {
     if(settings.debug) console.log("Joined new guild", data);
+    
     const joined = new Date(data?.guild?.joined_at || 0);
     if(joined.getTime() < Date.now() - 30000) return; // Ignore guilds joined more than 30 seconds ago
     if(close) close(); // Close any open notices
@@ -89,8 +89,10 @@ const ON_GUILD_JOINED = data => {
 
 const ON_VOICE_STATE_UPDATE = data => {
     if(settings.debug) console.log("VOICE_STATE_UPDATE", data);
+    
     if(!data?.voiceStates?.length) return;
     const { userId, channelId, guildId } = data?.voiceStates[0];
+    
     if(!channelId && userId === currentUserId) { // User left voice channel
         if(settings.debug) console.log("User left voice channel", guildId);
         if(guild === guildId){
@@ -98,7 +100,6 @@ const ON_VOICE_STATE_UPDATE = data => {
             BdApi.UI.showToast("Leaving server in 5 seconds", {type: "success"});
             awaitingLeave = setTimeout(() => {
                 if(settings.debug) console.log("Leaving guild", guildId);
-                //BdApi.findModuleByProps("leaveGuild").leaveGuild(guildId);
                 leaveGuild(guildId);
                 guild = undefined;
                 awaitingLeave = undefined;
@@ -106,7 +107,7 @@ const ON_VOICE_STATE_UPDATE = data => {
             }, 5000);
         }
     } else { // User joined voice channel
-        if(awaitingLeave){
+        if(awaitingLeave && guild === guildId){
             if(settings.debug) console.log("User joined voice channel in watched guild before leaving guild. Cancelling leave.");
             clearTimeout(awaitingLeave);
             awaitingLeave = undefined;
